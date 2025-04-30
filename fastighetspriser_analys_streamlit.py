@@ -5,9 +5,16 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import requests
+import os
 
 
-fastighetspriser_df=pd.read_excel(f'svensk_ mäklarstatistik_bostadsrätter_streamlit.xlsx')
+# Get the path of the current script
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Build full path to the Excel file
+file_path = os.path.join(current_dir, 'svensk_ mäklarstatistik_bostadsrätter_streamlit.xlsx')
+
+fastighetspriser_df=pd.read_excel(file_path)
 fastighetspriser_df = fastighetspriser_df.rename(columns={ 'År': 'year','kr/kvm': 'price','Område': 'market'})
 
 #To make sure that avanza data is always fetched
