@@ -1,5 +1,5 @@
 # fastighetspriser_analys
-En webbsida (Streamlit app) för att jämföra utvecklingen av bostadspriserna mot andra tillgångsslag som aktier/fonder.
+En webbsida (Streamlit app) för att jämföra utvecklingen av bostadspriserna mot andra tillgångsslag som aktier/fonder: https://fastighetspriser-analys.streamlit.app/
 
 Bostadspriserna (svensk_ mäklarstatistik_bostadsrätter_streamlit.xlsx) hämtas från: https://www.maklarstatistik.se/omrade/riket/#/bostadsratter/arshistorik-prisutveckling
 
