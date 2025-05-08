@@ -133,8 +133,8 @@ Där i är åren som inkluderas i "Välj vilka år att inkludera" och P är pris
 """)
 
 
-"""This adjustment is due to url not working for all years if 01-01 or 01-31 is chosen
-01-31 is chosen because for early years such as 1996 the first value if 1996-01-01 becomes 1995-12-31"""
+#This adjustment is due to url not working for all years if 01-01 or 01-31 is chosen
+#01-31 is chosen because for early years such as 1996 the first value if 1996-01-01 becomes 1995-12-31
 url_dow_jones = f'https://www.avanza.se/_api/price-chart/stock/18985?from={selected_min_year}-01-31&to={selected_max_year}-12-31'
 response = requests.get(url_dow_jones)
 dow_jones = response.json()
