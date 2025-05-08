@@ -18,7 +18,8 @@ market_colors = {
     'Malmö': 'purple',
     'Göteborg': 'grey',
     'Norrköping': 'blue',
-    'Västerås': 'brown'
+    'Västerås': 'brown',
+    'Uppsala': 'violet'
 }
 
 
@@ -110,6 +111,7 @@ ax.set_xlabel('År')
 ax.set_ylabel('kr/kvm')
 ax.legend()
 ax.grid(True)
+ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1))
 st.pyplot(fig)        
 
 selected_min_year, selected_max_year = year_range
@@ -120,7 +122,7 @@ st.markdown("**Källa:**")
 st.markdown(f"{url_maklarstatistik}")
 
 
-############DOW Jones########################################################################
+############Dow Jones########################################################################
 
 st.subheader("Total avkastning Dow jones mot Fastighetspriser")
 
@@ -164,6 +166,7 @@ ax.set_xlabel('År')
 ax.set_ylabel('Total avkastning')
 ax.legend()
 ax.grid(True)
+ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1))
 st.pyplot(fig)   
 
 st.markdown("**Källor:**")
@@ -217,6 +220,7 @@ ax.set_xlabel('År')
 ax.set_ylabel('Total avkastning med hävstång')
 ax.legend()
 ax.grid(True)
+ax.legend(loc='upper right', bbox_to_anchor=(1.6, 1))
 st.pyplot(fig) 
 
 st.markdown(f"Beräkningen utgår ifrån att man har beloppet {inv_amount} att investera i en fastighetsfond eller i en fastighet mha lånebeloppet={inv_amount}/0.15 (Hävstång). För fastigheten betalas hela lånet tillbaka.(vilket inte är helt korrekt sedan amorteringskrav infördes)")
