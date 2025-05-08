@@ -37,7 +37,7 @@ fastighetspriser_df = fastighetspriser_df.rename(columns={ 'År': 'year','kr/kvm
 
 def calculate_total_return(df,return_column):
 
-    df['return'] = df[{return_column}] / df[{return_column}].shift(1)
+    df['return'] = df[f'{return_column}'] / df[f'{return_column}'].shift(1)
     df.loc[0, 'return'] = 1
     df['total_return'] = df['return'].cumprod()
 
@@ -47,7 +47,7 @@ def calculate_total_return(df,return_column):
 #might be used later
 def calculate_cumulative_return(df,return_column):
 
-    df['cumulative_return'] = df[{return_column}] / df[{return_column}].iloc[0]
+    df['cumulative_return'] = df[f'{return_column}'] / df[f'{return_column}'].iloc[0]
 
     return df
 
