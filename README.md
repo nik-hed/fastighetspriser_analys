@@ -1,10 +1,17 @@
 # fastighetspriser_analys
-En webbsida (Streamlit app) för att jämföra utvecklingen av bostadspriserna mot andra tillgångsslag som aktier/fonder: https://fastighetspriser-analys.streamlit.app/
+En webbsida (Streamlit app) för att jämföra utvecklingen av bostadspriserna mot andra tillgångsslag som aktier/fonder/makro: https://fastighetspriser-analys.streamlit.app/
+
+Användare kan välja marknad (Sverige,Malmö,Stockholm,Linköping och Örebro) och vilken tidsperiod analysen ska göras för.
 
 Bostadspriserna (svensk_ mäklarstatistik_bostadsrätter_streamlit.xlsx) hämtas från: https://www.maklarstatistik.se/omrade/riket/#/bostadsratter/arshistorik-prisutveckling
 
-För att representera "aktiemarknaden har jag valt följande:
+För att representera "aktiemarknaden har jag valt:
 https://www.avanza.se/index/om-indexet.html/18985/dow-jones
 
+För att representera "aktiemarknaden med hävstång" har jag valt:
+https://www.avanza.se/fonder/om-fonden.html/350/lansforsakringar-fastighetsfond-a
 
-Användare kan välja marknad (Sverige,Malmö,Stockholm,Linköping och Örebro) och vilken tidsperiod analysen ska göras för.
+**Makro:**
+Ränta: https://www.riksbank.se/sv/statistik/rantor-och-valutakurser/sok-rantor-och-valutakurser/?s=g2-SECBREPOEFF&a=M&from=1995-01-02&to=2025-06-17&fs=3#result-section
+Inflation: https://www.riksbank.se/sv/penningpolitik/inflationsmalet/inflationen-just-nu/
+
