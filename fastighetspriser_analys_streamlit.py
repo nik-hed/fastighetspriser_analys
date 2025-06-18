@@ -1,5 +1,4 @@
 
-
 import pandas as pd
 import streamlit as st
 import pandas as pd
@@ -44,7 +43,10 @@ fastighetspriser_df = fastighetspriser_df.rename(columns={ 'År': 'year','kr/kvm
 
 #Inflation:
 scb = SCB('sv')
-scb.info()
+scb.go_down('PR')
+scb.go_down('PR0101')
+scb.go_down('PR0101G')
+scb.go_down('KPIF')
 KPIF_data=scb.get_data()
 KPIF_output=KPIF_data['data']
 KPIF_df = pd.DataFrame(KPIF_output, columns=['key', 'values'])
@@ -56,7 +58,7 @@ KPIF_df = KPIF_df.drop(columns=['values','key'])
 KPIF_df['year'] = KPIF_df['yearmonth'] // 100
 KPIF_df['yearmonth'] = pd.to_datetime(KPIF_df['yearmonth'].astype(str), format='%Y%m')
 KPIF_df=KPIF_df.query("year>=1995")
-
+#%%
 #Interest rate:
 file_path_styrranta = os.path.join(current_dir, 'riksbank_styrranta_streamlit.xlsx')
 styrranta_df=pd.read_excel(file_path_styrranta)
@@ -305,7 +307,7 @@ st.pyplot(fig)
 
 
 
-st.markdown("För att enklare kunna jämföra fastighetspriser mot makro tas ett genomsnitt fram för varje år för inflationen och räntan, sen normaliseras alla värdena och visas därefter i samma figur:")
+st.markdown("För att enklare kunna jämföra fastighetspriser mot makro tas ett genomsnitt fram för varje år för inflationen och räntan, sen normaliseras alla värdena och visas därefter i samma figur nedan.")
 st.markdown("Normalisering av värden är i detta fall: https://en.wikipedia.org/wiki/Feature_scaling#Rescaling_(min-max_normalization)")
 
 
