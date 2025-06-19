@@ -101,7 +101,9 @@ def convert_unix(df,selected_min_year,selected_max_year):
     return df
 
 
-
+# Sidebar filters
+# In order to not hide the filters
+st.sidebar.header("")
 
 # Market checkbox filters
 markets = sorted(fastighetspriser_df['market'].unique())
