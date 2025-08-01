@@ -1,13 +1,14 @@
 
 import pandas as pd
 import streamlit as st
-import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import requests
 import os
 import matplotlib.dates as mdates
 from matplotlib.ticker import MaxNLocator
+from datetime import date
+import urllib.request, json 
 
 #https://github.com/kirajcg/pyscbwrapper/blob/master/pyscbwrapper.ipynb
 from pyscbwrapper import SCB
@@ -26,6 +27,36 @@ market_colors = {
     'Västerås': 'brown',
     'Uppsala': 'violet'
 }
+
+
+def calculate_total_return(df,return_column):
+
+    df['return'] = df[f'{return_column}'] / df[f'{return_column}'].shift(1)
+    df.loc[0, 'return'] = 1
+    df['total_return'] = df['return'].cumprod()
+
+
+    return df
+
+
+def convert_unix(df,selected_min_year,selected_max_year):
+
+    """issue when fetching the data is that depending on the years different dates are fetched, in order to 
+    correct this,the closest date to the first day of each year will get fetched
+    after that the filtering will be done based on the user input"""
+
+    df['date'] = pd.to_datetime(df['timestamp'], unit='ms').dt.normalize()
+    df['year'] = df['date'].dt.year
+    df['days_from_jan1'] = (df['date'] - pd.to_datetime(df['year'].astype(str) + '-01-01')).abs()
+    df = df.loc[df.groupby('year')['days_from_jan1'].idxmin()].drop(columns='days_from_jan1').reset_index()
+    df['date'] = pd.to_datetime(df['year'].astype(str) + '-01-01')
+    df=df.query(f"date >= '{selected_min_year}-01-01' and  date<='{selected_max_year}-01-01'").reset_index()
+    df['year'] = df['year'].astype(int)
+
+    return df
+
+
+#Collect data:
 
 
 url_maklarstatistik='https://www.maklarstatistik.se/omrade/riket/#/bostadsratter/arshistorik-prisutveckling'
@@ -47,6 +78,7 @@ scb.go_down('PR')
 scb.go_down('PR0101')
 scb.go_down('PR0101G')
 scb.go_down('KPIF')
+inflation_url=scb.get_url()
 KPIF_data=scb.get_data()
 KPIF_output=KPIF_data['data']
 KPIF_df = pd.DataFrame(KPIF_output, columns=['key', 'values'])
@@ -60,45 +92,29 @@ KPIF_df['yearmonth'] = pd.to_datetime(KPIF_df['yearmonth'].astype(str), format='
 KPIF_df=KPIF_df.query("year>=1995")
 #%%
 #Interest rate:
-file_path_styrranta = os.path.join(current_dir, 'riksbank_styrranta_streamlit.xlsx')
-styrranta_df=pd.read_excel(file_path_styrranta)
-styrranta_df = styrranta_df.rename(columns={ 'Period': 'yearmonth','Medel': 'styrranta'})
-styrranta_df['year'] = styrranta_df['yearmonth'] // 100  # Integer division to get the year
-styrranta_df['yearmonth'] = pd.to_datetime(styrranta_df['yearmonth'].astype(str), format='%Y%m')
-styrranta_df['styrranta'] = pd.to_numeric(styrranta_df['styrranta'], errors='coerce')
 
-def calculate_total_return(df,return_column):
+#Styrräntans serie-ID:
+seriesId='SECBREPOEFF'
 
-    df['return'] = df[f'{return_column}'] / df[f'{return_column}'].shift(1)
-    df.loc[0, 'return'] = 1
-    df['total_return'] = df['return'].cumprod()
+api_key=st.secrets["api_keys"]["riksbanken_primary_key"]
+url=f"https://api.riksbank.se/swea/v1/ObservationAggregates/SECBREPOEFF/M/1995-01-01?subscription-key={api_key}"
 
 
-    return df
-
-#might be used later
-def calculate_cumulative_return(df,return_column):
-
-    df['cumulative_return'] = df[f'{return_column}'] / df[f'{return_column}'].iloc[0]
-
-    return df
+with urllib.request.urlopen(url) as urlriksbank:
+    data_riksbank = json.load(urlriksbank)
 
 
-def convert_unix(df,selected_min_year,selected_max_year):
+styrranta_df=pd.DataFrame(data_riksbank)
 
-    """issue when fetching the data is that depending on the years different dates are fetched, in order to 
-    correct this,the closest date to the first day of each year will get fetched
-    after that the filtering will be done based on the user input"""
+styrranta_df['yearmonth'] = pd.to_datetime(styrranta_df['from']).dt.to_period('M').dt.to_timestamp()
+styrranta_df['yearmonth'] = styrranta_df['yearmonth'].dt.date
 
-    df['date'] = pd.to_datetime(df['timestamp'], unit='ms').dt.normalize()
-    df['year'] = df['date'].dt.year
-    df['days_from_jan1'] = (df['date'] - pd.to_datetime(df['year'].astype(str) + '-01-01')).abs()
-    df = df.loc[df.groupby('year')['days_from_jan1'].idxmin()].drop(columns='days_from_jan1').reset_index()
-    df['date'] = pd.to_datetime(df['year'].astype(str) + '-01-01')
-    df=df.query(f"date >= '{selected_min_year}-01-01' and  date<='{selected_max_year}-01-01'").reset_index()
-    df['year'] = df['year'].astype(int)
+styrranta_df = styrranta_df.rename(columns={ 'average': 'styrranta'})
 
-    return df
+styrranta_df=styrranta_df[['yearmonth','styrranta','year']]
+
+
+
 
 
 # Sidebar filters
@@ -130,7 +146,7 @@ fastighetspriser_df_filtered = fastighetspriser_df[
             (fastighetspriser_df['year'] <= year_range[1])
         ]
 
-
+st.header("Analys av fastighetspriser i Sverige", divider="gray")
 st.subheader("Utveckling fastighetspriser i olika städer i Sverige")
 fig, ax = plt.subplots()
 for market in selected_markets:
@@ -144,28 +160,35 @@ ax.set_ylabel('kr/kvm')
 ax.legend()
 ax.grid(True)
 ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1))
+plt.xlim(min(df_market['year']), max(df_market['year']))
+if len(df_market)>=4:
+    plt.xticks([df_market['year'].iloc[0],df_market['year'].iloc[len(df_market) // 4],df_market['year'].iloc[len(df_market) // 2],df_market['year'].iloc[len(df_market)-len(df_market) // 4] , df_market['year'].iloc[-1]])
+else:
+    plt.xticks([df_market['year'].iloc[0],df_market['year'].iloc[-1]])
 st.pyplot(fig)        
 
 selected_min_year, selected_max_year = year_range
 
-fastighetspriser_df_filtered['date'] = pd.to_datetime(fastighetspriser_df_filtered['year'].astype(str), format='%Y')
+fastighetspriser_df_filtered.loc['date'] = pd.to_datetime(fastighetspriser_df_filtered['year'].astype(str), format='%Y')
 
-st.markdown("**Källa:**") 
+
+st.markdown("<u>Datakälla:</u>", unsafe_allow_html=True)
+
 st.markdown(f"{url_maklarstatistik}")
 st.markdown("""
 Priserna som visar på marklarstistik.se är genomsnittet för året.
 """)
-
+st.markdown("---")
 ############Dow Jones########################################################################
 
-st.subheader("Total avkastning Dow jones mot Fastighetspriser")
+st.subheader("Total avkastning Dow Jones mot fastighetspriser")
 
 st.latex(r"""
 \text{Total Avkastning}_t = \prod_{i=1}^{t} (\frac{P_{\text{i}}}{P_{\text{i-1}}}) 
 """)
 
 st.markdown("""
-Där **i** är åren som väljs med "Välj vilka år att inkludera" och **P** är priset på index/fond/fastighet under dessa år.
+Där **i** är åren som väljs med "Välj vilka år att inkludera" och **P** är priset på index/fond/fastighet [1] under dessa år.
 """)
 
 
@@ -201,18 +224,36 @@ ax.set_ylabel('Total avkastning')
 ax.legend()
 ax.grid(True)
 ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1))
+plt.xlim(min(dow_jones_df['year']), max(dow_jones_df['year']))
+if len(dow_jones_df)>=4:
+    plt.xticks([dow_jones_df['year'].iloc[0],dow_jones_df['year'].iloc[len(dow_jones_df) // 4],dow_jones_df['year'].iloc[len(dow_jones_df) // 2],dow_jones_df['year'].iloc[len(dow_jones_df)-len(dow_jones_df) // 4] , dow_jones_df['year'].iloc[-1]])
+else:
+    plt.xticks([dow_jones_df['year'].iloc[0],dow_jones_df['year'].iloc[-1]])
 st.pyplot(fig)   
 
-st.markdown("**Källor:**")
+st.markdown("<u>Datakälla:</u>", unsafe_allow_html=True)
 st.markdown(f"{url_dow_jones}")
-st.markdown("https://www.avanza.se/index/om-indexet.html/18985/dow-jones")
 
 
+st.markdown("---")
 
 ############Länsförsäkringar Fastighetsfond########################################################################
 
 
 st.subheader("Total avkastning fastigheter med hävstång mot fastighetsfond")
+
+
+
+inv_amount=1000
+loan_amount=inv_amount/0.15
+
+
+st.markdown(f"Beräkningen utgår ifrån att man har beloppet {inv_amount} att investera i en fastighetsfond [2] eller i en fastighet med hävstång ({inv_amount}/0.15). För fastigheten betalas hela lånet tillbaka, vilket inte är helt korrekt sedan amorteringskravet infördes.")
+
+st.latex(r"""
+\scriptsize         
+\text{Total Avkastning med hävstång}_t = Lånebeloppet*(\prod_{i=1}^{t}\frac{P_{\text{i}}}{P_{\text{i-1}}} - 0.85) 
+""")
 
 url_fastighetsfond = f'https://www.avanza.se/_api/fund-guide/chart/350/{selected_min_year}-01-31/{selected_max_year}-12-31?raw=true'
 response = requests.get(url_fastighetsfond)
@@ -229,9 +270,6 @@ fastighetsfond_df=calculate_total_return(fastighetsfond_df,'y')
 
 
 
-#might add for the user to change this
-inv_amount=1000
-loan_amount=inv_amount/0.15
 
 fastighetsfond_df['total_return_hävstång'] = inv_amount * fastighetsfond_df['total_return']
 
@@ -248,69 +286,91 @@ for market in selected_markets:
 
 
 
-ax.plot(fastighetsfond_df['year'], fastighetsfond_df['total_return_hävstång'], label='Länsförsäkringar Fastighetsfond', color=market_colors['Länsförsäkringar Fastighetsfond'])
+ax.plot(fastighetsfond_df['year'], fastighetsfond_df['total_return_hävstång'], label='Fastighetsfond', color=market_colors['Länsförsäkringar Fastighetsfond'])
 ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
 ax.set_xlabel('År')
 ax.set_ylabel('Total avkastning med hävstång')
 ax.legend()
 ax.grid(True)
-ax.legend(loc='upper right', bbox_to_anchor=(1.6, 1))
+ax.legend(loc='upper right', bbox_to_anchor=(1.35, 1))
+plt.xlim(min(fastighetsfond_df['year']), max(fastighetsfond_df['year']))
+if len(fastighetsfond_df)>=4:
+    plt.xticks([fastighetsfond_df['year'].iloc[0],fastighetsfond_df['year'].iloc[len(fastighetsfond_df) // 4],fastighetsfond_df['year'].iloc[len(fastighetsfond_df) // 2],fastighetsfond_df['year'].iloc[len(fastighetsfond_df)-len(fastighetsfond_df) // 4] , fastighetsfond_df['year'].iloc[-1]])
+else:
+    plt.xticks([fastighetsfond_df['year'].iloc[0],fastighetsfond_df['year'].iloc[-1]])
+
 st.pyplot(fig) 
 
-st.markdown(f"Beräkningen utgår ifrån att man har beloppet {inv_amount} att investera i en fastighetsfond eller i en fastighet mha lånebeloppet={inv_amount}/0.15(Hävstång). För fastigheten betalas hela lånet tillbaka, vilket inte är helt korrekt sedan amorteringskravet infördes.")
 
-st.latex(r"""
-\scriptsize         
-\text{Total Avkastning med hävstång}_t = Lånebeloppet*(\prod_{i=1}^{t}\frac{P_{\text{i}}}{P_{\text{i-1}}} - 0.85) 
-""")
 
-st.markdown("**Källor:**")
+st.markdown("<u>Datakälla:</u>", unsafe_allow_html=True)
 st.markdown(f"{url_fastighetsfond}")
-st.markdown("https://doc.morningstar.com/Document/ea76022ed9e0403688422e3cdd2d1afd.msdoc/?key=b9f1f970e71ab35ebb8299a03a0117c2e3ebb292872b668ea92e3b8d3ba9b3e79a8a45e5a3afde3e")
+st.markdown("---")
+
 #Makro
 
-st.subheader("Makro(Styrränta och Inflation) och Fastighetspriser")
+st.subheader("Makro(Styrränta och Inflation) och fastighetspriser")
 
-st.markdown("**Styrränta**")
-st.markdown("Styrränta är den ränta som bankerna kan låna eller placera till i Riksbanken på sju dagar. Riksbankens ränta är Riksbankens viktigaste styrränta.Riksbankens styrränta kallades reporänta fram till 8 juni 2022")
-st.markdown("**Källa:**")
-st.markdown("https://www.riksbank.se/sv/statistik/rantor-och-valutakurser/sok-rantor-och-valutakurser/?s=g2-SECBREPOEFF&a=M&from=1995-01-02&to=2025-06-17&fs=3#result-section")
-
+st.markdown("***Styrränta:***")
+st.markdown("Styrräntan är den ränta som Riksbankens direktion fattar beslut om i syfte att uppnå inflationsmålet. Styrräntans funktion och syfte är att styra dagslåneräntan på marknaden och påverka andra räntor i ekonomin så att inflationsmålet uppnås. [3]")
 
 fig, ax = plt.subplots()
-ax.plot(styrranta_df['yearmonth'], styrranta_df['styrranta'], label=['Styrränta'], color='blue')
+ax.plot(styrranta_df['yearmonth'], styrranta_df['styrranta'], label=['Styrränta'], color='black')
 ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))  
 ax.set_xlabel("År")
 ax.set_ylabel("Styrränta")
 ax.set_title("Historisk utveckling av styrräntan")
 ax.legend(loc='upper right', bbox_to_anchor=(1.6, 1))
 ax.grid(True)
+plt.xlim(min(styrranta_df['yearmonth']), max(styrranta_df['yearmonth']))
+if len(styrranta_df)>=4:
+    plt.xticks([styrranta_df['yearmonth'].iloc[0],styrranta_df['yearmonth'].iloc[len(styrranta_df) // 4],styrranta_df['yearmonth'].iloc[len(styrranta_df) // 2],styrranta_df['yearmonth'].iloc[len(styrranta_df)-len(styrranta_df) // 4] , styrranta_df['yearmonth'].iloc[-1]])
+else:
+    plt.xticks([styrranta_df['yearmonth'].iloc[0],styrranta_df['yearmonth'].iloc[-1]])
 
 st.pyplot(fig)
 
-st.markdown("**Inflation:**")
-st.markdown("Inflationen visar hur prisnivån, mätt som KPIF, har förändrats jämfört med samma månad föregående år. Målet är att inflationen ska vara 2 procent per år, mätt som den årliga procentuella förändringen i KPIF.")
-st.markdown("**Källa:**")
-st.markdown("https://www.riksbank.se/sv/penningpolitik/inflationsmalet/inflationen-just-nu/")
+
+st.markdown("<u>Datakälla:</u>", unsafe_allow_html=True)
+st.markdown(f"https://www.riksbank.se/sv/statistik/rantor-och-valutakurser/sok-rantor-och-valutakurser/?s=g2-SECBREPOEFF&a=M&from=1995-01-02&to={date.today().strftime('%Y-%m-%d')}&fs=3#result-section")
+
+
+st.markdown("---")
+
+st.markdown("***Inflation(KBIF):***")
+st.markdown("Inflationen visar hur prisnivån, mätt som KPIF, har förändrats jämfört med samma månad föregående år. Målet är att inflationen ska vara 2 procent per år, mätt som den årliga procentuella förändringen i KPIF. [4]")
+
+
 
 
 fig, ax = plt.subplots()
 #to limit the y-axis in the plot
 ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-ax.plot(KPIF_df['yearmonth'], KPIF_df['KPIF'], label=['KPIF'], color='red')
+ax.plot(KPIF_df['yearmonth'], KPIF_df['KPIF'], label=['KPIF'], color='grey')
 ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))  # or '%Y' for just year
 ax.set_xlabel("År")
 ax.set_ylabel("KPIF")
 ax.set_title("Historisk utveckling av inflationen")
 ax.legend(loc='upper right', bbox_to_anchor=(1.6, 1))
 ax.grid(True)
+plt.xlim(min(KPIF_df['yearmonth']), max(KPIF_df['yearmonth']))
+if len(KPIF_df)>=4:
+    plt.xticks([KPIF_df['yearmonth'].iloc[0],KPIF_df['yearmonth'].iloc[len(KPIF_df) // 4],KPIF_df['yearmonth'].iloc[len(KPIF_df) // 2],KPIF_df['yearmonth'].iloc[len(KPIF_df)-len(KPIF_df) // 4] , KPIF_df['yearmonth'].iloc[-1]])
+else:
+    plt.xticks([KPIF_df['yearmonth'].iloc[0],KPIF_df['yearmonth'].iloc[-1]])
 
 st.pyplot(fig)
 
 
 
-st.markdown("För att enklare kunna jämföra fastighetspriser mot makro tas ett genomsnitt fram för varje år för inflationen och räntan, sen normaliseras alla värdena och visas därefter i samma figur nedan.")
-st.markdown("Normalisering av värden är i detta fall: https://en.wikipedia.org/wiki/Feature_scaling#Rescaling_(min-max_normalization)")
+
+st.markdown("<u>Datakälla:</u>", unsafe_allow_html=True)
+#st.markdown("https://www.riksbank.se/sv/penningpolitik/inflationsmalet/inflationen-just-nu/")
+st.markdown(f"{inflation_url}")
+
+st.markdown("---")
+
+st.markdown("För att enklare kunna jämföra fastighetspriser mot makro tas ett genomsnitt fram för varje år för inflationen och räntan, sen normaliseras(min-max normalization) [5] alla värden och visas därefter i samma figur:")
 
 
 #used to compare to styrräntan:
@@ -343,4 +403,16 @@ ax.set_ylabel('Normaliserade makrovärden')
 ax.legend()
 ax.grid(True)
 ax.legend(loc='upper right', bbox_to_anchor=(1.6, 1))
-st.pyplot(fig)
+plt.xlim(min(normalized_df['year']), max(normalized_df['year']))
+if len(normalized_df)>=4:
+    plt.xticks([normalized_df['year'].iloc[0],normalized_df['year'].iloc[len(normalized_df) // 4],normalized_df['year'].iloc[len(normalized_df) // 2],normalized_df['year'].iloc[len(normalized_df)-len(normalized_df) // 4] , normalized_df['year'].iloc[-1]])
+else:
+    plt.xticks([normalized_df['year'].iloc[0],normalized_df['year'].iloc[-1]])
+
+st.pyplot(fig) 
+
+st.markdown("[1] https://www.avanza.se/index/om-indexet.html/18985/dow-jones")
+st.markdown("[2] https://doc.morningstar.com/Document/ea76022ed9e0403688422e3cdd2d1afd.msdoc/?key=b9f1f970e71ab35ebb8299a03a0117c2e3ebb292872b668ea92e3b8d3ba9b3e79a8a45e5a3afde3e")
+st.markdown("[3] https://www.riksbank.se/sv/statistik/rantor-och-valutakurser/styrranta-in--och-utlaningsranta/")
+st.markdown("[4] https://www.riksbank.se/sv/penningpolitik/inflationsmalet/inflationen-just-nu/")
+st.markdown("[5] https://en.wikipedia.org/wiki/Feature_scaling#Rescaling_(min-max_normalization)")
