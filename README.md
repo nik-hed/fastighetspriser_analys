@@ -13,7 +13,7 @@ https://www.avanza.se/fonder/om-fonden.html/350/lansforsakringar-fastighetsfond-
 
 **Makro:**
 
-Ränta: https://www.riksbank.se/sv/statistik/rantor-och-valutakurser/sok-rantor-och-valutakurser/?s=g2-SECBREPOEFF&a=M&from=1995-01-02&to=2025-06-17&fs=3#result-section finns i filen riksbank_styrranta_streamlit.xlsx.
+Ränta: https://www.riksbank.se/sv/statistik/rantor-och-valutakurser/styrranta-in--och-utlaningsranta/
 
 Inflation: https://www.riksbank.se/sv/penningpolitik/inflationsmalet/inflationen-just-nu/
 
